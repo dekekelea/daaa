@@ -1,0 +1,70 @@
+-- 🌈 ESP + Aimbot Fix (Clic Droit)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local Aiming = false
+local FOV = 120
+
+-- Circle + Crosshair
+local Circle = Drawing.new("Circle")
+Circle.Radius = FOV
+Circle.Color = Color3.fromRGB(255,0,255)
+Circle.Thickness = 2
+Circle.Transparency = 0.8
+Circle.Filled = false
+Circle.Visible = true
+
+local CrossH = Drawing.new("Line")
+local CrossV = Drawing.new("Line")
+CrossH.Thickness = 2
+CrossV.Thickness = 2
+CrossH.Color = Color3.fromRGB(255,255,255)
+CrossV.Color = Color3.fromRGB(255,255,255)
+
+-- Aimbot Clic Droit
+UserInputService.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton2 then Aiming = true end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton2 then Aiming = false end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local center = Camera.ViewportSize / 2
+    Circle.Position = center
+    
+    CrossH.From = Vector2.new(center.X-15, center.Y)
+    CrossH.To = Vector2.new(center.X+15, center.Y)
+    CrossV.From = Vector2.new(center.X, center.Y-15)
+    CrossV.To = Vector2.new(center.X, center.Y+15)
+
+    -- Aimbot
+    if Aiming then
+        local closest = nil
+        local minDist = FOV + 1
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr == LocalPlayer or not plr.Character then continue end
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = plr
+                    end
+                end
+            end
+        end
+        
+        if closest and closest.Character and closest.Character:FindFirstChild("HumanoidRootPart") then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, closest.Character.HumanoidRootPart.Position)
+        end
+    end
+end)
+
+print("✅ Cercle + Crosshair + Aimbot Clic Droit chargé")
+print("Maintiens le clic droit pour viser")
