@@ -1,0 +1,253 @@
+-- Rainbow Skeleton + Tracer + Name + Distance + Aimbot (Caps Lock)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local Skeletons = {}
+local Tracers = {}
+local Texts = {} -- Pour Name + Distance
+local Enabled = true
+local AimbotEnabled = true
+local Aiming = false
+local FOV = 140
+
+-- === CROSSHAIR ===
+local Crosshair = {}
+for i = 1, 4 do
+    local line = Drawing.new("Line")
+    line.Thickness = 1.5
+    line.Color = Color3.fromRGB(255, 255, 255)
+    line.Transparency = 0.8
+    table.insert(Crosshair, line)
+end
+
+local function UpdateCrosshair()
+    local center = Camera.ViewportSize / 2
+    local size = 13
+    Crosshair[1].From = Vector2.new(center.X - size, center.Y); Crosshair[1].To = Vector2.new(center.X + size, center.Y)
+    Crosshair[2].From = Vector2.new(center.X, center.Y - size); Crosshair[2].To = Vector2.new(center.X, center.Y + size)
+    Crosshair[3].From = Vector2.new(center.X - size-6, center.Y); Crosshair[3].To = Vector2.new(center.X - size, center.Y)
+    Crosshair[4].From = Vector2.new(center.X + size, center.Y); Crosshair[4].To = Vector2.new(center.X + size+6, center.Y)
+end
+
+-- === FOV CIRCLE ===
+local AimCircle = Drawing.new("Circle")
+AimCircle.Radius = FOV
+AimCircle.Thickness = 2
+AimCircle.Color = Color3.fromRGB(255, 0, 255)
+AimCircle.Transparency = 0.65
+AimCircle.Filled = false
+AimCircle.Visible = true
+AimCircle.Position = Camera.ViewportSize / 2
+
+-- === UI DÉPLAÇABLE ===
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer.PlayerGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 230, 0, 130)
+Frame.Position = UDim2.new(0, 10, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Parent = ScreenGui
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+
+local TitleBar = Instance.new("TextLabel")
+TitleBar.Size = UDim2.new(1,0,0,32)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+TitleBar.Text = "   🌈 Rainbow ESP + Aimbot"
+TitleBar.TextColor3 = Color3.new(1,1,1)
+TitleBar.TextXAlignment = Enum.TextXAlignment.Left
+TitleBar.Font = Enum.Font.GothamBold
+TitleBar.Parent = Frame
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+
+-- Drag UI
+local dragging, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+TitleBar.InputEnded:Connect(function() dragging = false end)
+
+local btnESP = Instance.new("TextButton") btnESP.Size = UDim2.new(0.9,0,0,28) btnESP.Position = UDim2.new(0.05,0,0.32,0)
+btnESP.BackgroundColor3 = Color3.fromRGB(0,170,255) btnESP.Text = "ESP : ON" btnESP.TextScaled = true btnESP.Parent = Frame
+Instance.new("UICorner", btnESP)
+
+local btnAim = Instance.new("TextButton") btnAim.Size = UDim2.new(0.9,0,0,28) btnAim.Position = UDim2.new(0.05,0,0.58,0)
+btnAim.BackgroundColor3 = Color3.fromRGB(0,255,100) btnAim.Text = "Aimbot : ON (Verr Maj)" btnAim.TextScaled = true btnAim.Parent = Frame
+Instance.new("UICorner", btnAim)
+
+-- === ESP Functions ===
+local function CreateLine() 
+    local l = Drawing.new("Line")
+    l.Thickness = 1.7
+    l.Transparency = 1
+    l.Visible = false
+    return l 
+end
+
+local function WorldToScreen(pos)
+    local v, on = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(v.X, v.Y), on and v.Z > 0
+end
+
+local function HideAll(player)
+    if Skeletons[player] then for _,l in pairs(Skeletons[player]) do l.Visible = false end end
+    if Tracers[player] then Tracers[player].Visible = false end
+    if Texts[player] then 
+        Texts[player].Name.Visible = false 
+        Texts[player].Dist.Visible = false 
+    end
+end
+
+local function GetClosestPlayer()
+    local closest, minDist = nil, FOV
+    local center = Camera.ViewportSize / 2
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer or not p.Character then continue end
+        local root = p.Character:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+        local pos, on = WorldToScreen(root.Position)
+        if not on then continue end
+        local dist = (pos - center).Magnitude
+        if dist < minDist then minDist = dist closest = p end
+    end
+    return closest
+end
+
+-- Aimbot (Verr Maj)
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.CapsLock then Aiming = true end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.CapsLock then Aiming = false end
+end)
+
+-- Anti-blocage
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Escape or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        Aiming = false
+    end
+end)
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+    UpdateCrosshair()
+    AimCircle.Position = Camera.ViewportSize / 2
+
+    if AimbotEnabled and Aiming then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local tp = target.Character.HumanoidRootPart.Position
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, tp)
+        end
+    end
+
+    if not Enabled then 
+        for p,_ in pairs(Skeletons) do HideAll(p) end
+        return 
+    end
+
+    local hue = tick() * 4 % 360
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+        local char = player.Character
+        if not char then HideAll(player) continue end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local head = char:FindFirstChild("Head")
+        local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+        if not (root and head and torso) then HideAll(player) continue end
+
+        -- Skeleton
+        if not Skeletons[player] then
+            Skeletons[player] = {}
+            for i = 1, 8 do table.insert(Skeletons[player], CreateLine()) end
+        end
+        local skel = Skeletons[player]
+        local hPos, hOn = WorldToScreen(head.Position)
+        local tPos, tOn = WorldToScreen(torso.Position)
+
+        if hOn and tOn and skel[1] then
+            skel[1].From = hPos; skel[1].To = tPos
+            skel[1].Color = Color3.fromHSV(hue/360, 1, 1)
+            skel[1].Visible = true
+        end
+
+        local limbs = {char:FindFirstChild("LeftUpperArm"), char:FindFirstChild("RightUpperArm"),
+                       char:FindFirstChild("LeftUpperLeg"), char:FindFirstChild("RightUpperLeg")}
+        for i, limb in ipairs(limbs) do
+            if limb and skel[i+1] then
+                local lPos, lOn = WorldToScreen(limb.Position)
+                if tOn and lOn then
+                    skel[i+1].From = tPos
+                    skel[i+1].To = lPos
+                    skel[i+1].Color = Color3.fromHSV((hue + i*80)/360, 1, 1)
+                    skel[i+1].Visible = true
+                else skel[i+1].Visible = false end
+            end
+        end
+
+        -- Tracer
+        if not Tracers[player] then Tracers[player] = CreateLine() end
+        local tracer = Tracers[player]
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot and tOn then
+            local myPos = Camera:WorldToViewportPoint(myRoot.Position)
+            local tp = Camera:WorldToViewportPoint(root.Position)
+            tracer.From = Vector2.new(myPos.X, myPos.Y)
+            tracer.To = Vector2.new(tp.X, tp.Y)
+            tracer.Color = Color3.fromHSV((hue + 180)/360, 1, 1)
+            tracer.Visible = true
+        else tracer.Visible = false end
+
+        -- Name + Distance
+        if not Texts[player] then
+            Texts[player] = {
+                Name = Drawing.new("Text"),
+                Dist = Drawing.new("Text")
+            }
+            Texts[player].Name.Size = 15; Texts[player].Name.Center = true; Texts[player].Name.Outline = true; Texts[player].Name.Color = Color3.fromRGB(255,255,255)
+            Texts[player].Dist.Size = 13; Texts[player].Dist.Center = true; Texts[player].Dist.Outline = true; Texts[player].Dist.Color = Color3.fromRGB(200,200,200)
+        end
+
+        local nameText = Texts[player].Name
+        local distText = Texts[player].Dist
+
+        nameText.Text = player.Name
+        nameText.Position = Vector2.new(tPos.X, tPos.Y - 35)
+        nameText.Visible = tOn
+
+        local dist = myRoot and math.floor((myRoot.Position - root.Position).Magnitude) or 0
+        distText.Text = dist .. " studs"
+        distText.Position = Vector2.new(tPos.X, tPos.Y + 25)
+        distText.Visible = tOn
+    end
+end)
+
+-- UI Toggles
+btnESP.MouseButton1Click:Connect(function()
+    Enabled = not Enabled
+    btnESP.Text = Enabled and "ESP : ON" or "ESP : OFF"
+    btnESP.BackgroundColor3 = Enabled and Color3.fromRGB(0,170,255) or Color3.fromRGB(170,0,0)
+end)
+
+btnAim.MouseButton1Click:Connect(function()
+    AimbotEnabled = not AimbotEnabled
+    btnAim.Text = AimbotEnabled and "Aimbot : ON (Verr Maj)" or "Aimbot : OFF"
+end)
+
+print("✅ Script final chargé ! Appuie sur Verr Maj pour aimbot.")
