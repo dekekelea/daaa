@@ -1,0 +1,165 @@
+-- Blox Tracker by Exot - Version Finale
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- UI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer.PlayerGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 360, 0, 520)
+Frame.Position = UDim2.new(0, 25, 0, 25)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+Frame.Parent = ScreenGui
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 16)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 55)
+Title.BackgroundColor3 = Color3.fromRGB(0, 90, 200)
+Title.Text = "Blox Tracker by Exot"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextScaled = true
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Frame
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 16)
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -20, 1, -80)
+Scroll.Position = UDim2.new(0, 10, 0, 65)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 6
+Scroll.Parent = Frame
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 12)
+ListLayout.Parent = Scroll
+
+local function GetIsland(pos)
+    if not pos then return "Inconnue" end
+    local y = pos.Y
+    if y > 14500 then return "Hydra Island"
+    elseif y > 9500 then return "Tiki Outpost"
+    elseif y > 6200 then return "Sea 3"
+    elseif y > 2800 then return "Port Town"
+    elseif y > 1500 then return "Cocoa Island"
+    elseif y > 600 then return "Kingdom of Rose"
+    else return "First Sea" end
+end
+
+local function RainbowTracer(myRoot, targetRoot)
+    local line = Drawing.new("Line")
+    line.Thickness = 2.8
+    line.Transparency = 1
+    
+    spawn(function()
+        for i = 1, 110 do  -- Longueur max
+            if not targetRoot.Parent then break end
+            local p1 = Camera:WorldToViewportPoint(myRoot.Position)
+            local p2 = Camera:WorldToViewportPoint(targetRoot.Position)
+            line.From = Vector2.new(p1.X, p1.Y)
+            line.To = Vector2.new(p2.X, p2.Y)
+            line.Color = Color3.fromHSV((tick() * 10) % 1, 1, 1) -- Rainbow très rapide
+            line.Visible = true
+            wait(0.016)
+        end
+        line:Remove()
+    end)
+end
+
+local function CreatePlayerEntry(player)
+    local Entry = Instance.new("Frame")
+    Entry.Size = UDim2.new(1, 0, 0, 130)
+    Entry.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    Entry.Parent = Scroll
+    Instance.new("UICorner", Entry).CornerRadius = UDim.new(0, 12)
+
+    local Name = Instance.new("TextLabel")
+    Name.Size = UDim2.new(1, 0, 0, 30)
+    Name.BackgroundTransparency = 1
+    Name.Text = player.Name
+    Name.TextColor3 = Color3.new(1,1,1)
+    Name.TextScaled = true
+    Name.Font = Enum.Font.GothamBold
+    Name.Parent = Entry
+
+    local ls = player:FindFirstChild("leaderstats")
+    local beli = ls and ls:FindFirstChild("Beli") and ls.Beli.Value or 0
+    local level = ls and ls:FindFirstChild("Level") and ls.Level.Value or 0
+    local bounty = ls and ls:FindFirstChild("Bounty") and ls.Bounty.Value or 0
+
+    local Stats = Instance.new("TextLabel")
+    Stats.Size = UDim2.new(1, 0, 0, 55)
+    Stats.Position = UDim2.new(0, 0, 0, 30)
+    Stats.BackgroundTransparency = 1
+    Stats.Text = "Lv." .. level .. "   |   Beli : " .. beli .. "\nBounty : " .. bounty
+    Stats.TextColor3 = Color3.fromRGB(200, 220, 255)
+    Stats.TextScaled = true
+    Stats.Parent = Entry
+
+    local Island = Instance.new("TextLabel")
+    Island.Size = UDim2.new(1, 0, 0, 25)
+    Island.Position = UDim2.new(0, 0, 0, 85)
+    Island.BackgroundTransparency = 1
+    Island.Text = "Île : Chargement..."
+    Island.TextColor3 = Color3.fromRGB(0, 255, 180)
+    Island.TextScaled = true
+    Island.Parent = Entry
+
+    spawn(function()
+        while Entry.Parent do
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                Island.Text = "Île : " .. GetIsland(root.Position)
+            end
+            wait(4)
+        end
+    end)
+
+    -- Bouton Tracer
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0.95, 0, 0, 32)
+    Btn.Position = UDim2.new(0.025, 0, 0, 112)
+    Btn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    Btn.Text = "Tracer vers " .. player.Name
+    Btn.TextColor3 = Color3.new(1,1,1)
+    Btn.TextScaled = true
+    Btn.Parent = Entry
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
+
+    Btn.MouseButton1Click:Connect(function()
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local targetRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot and targetRoot then
+            RainbowTracer(myRoot, targetRoot)
+        end
+    end)
+end
+
+local function RefreshList()
+    for _, v in pairs(Scroll:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            CreatePlayerEntry(plr)
+        end
+    end
+end
+
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.new(0.9, 0, 0, 38)
+RefreshBtn.Position = UDim2.new(0.05, 0, 1, -50)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(0, 220, 120)
+RefreshBtn.Text = "🔄 Rafraîchir Liste"
+RefreshBtn.TextColor3 = Color3.new(1,1,1)
+RefreshBtn.TextScaled = true
+RefreshBtn.Parent = Frame
+Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 10)
+
+RefreshBtn.MouseButton1Click:Connect(RefreshList)
+
+RefreshList()
+
+print("Blox Tracker chargé - Appuie sur Rafraîchir si besoin")
